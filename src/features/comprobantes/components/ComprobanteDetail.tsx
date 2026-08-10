@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import { Button } from "../../../components/ui/button"
 import { Input } from "../../../components/ui/input"
 import { Label } from "../../../components/ui/label"
@@ -20,6 +21,7 @@ interface ComprobanteDetailProps {
 }
 
 export function ComprobanteDetail({ comprobante, onClose }: ComprobanteDetailProps) {
+  const navigate = useNavigate()
   const [pagos, setPagos] = useState<CobroPago[]>([])
   const [loadingPagos, setLoadingPagos] = useState(false)
   
@@ -369,7 +371,7 @@ export function ComprobanteDetail({ comprobante, onClose }: ComprobanteDetailPro
                       <Button
                         onClick={() => {
                           onClose();
-                          window.location.href = `/emitir?docModificadoId=${localComprobante.serie}-${localComprobante.numero}&docModificadoTipo=03&tipoDocumento=07`;
+                          navigate(`/emitir?docModificadoId=${localComprobante.serie}-${localComprobante.numero}&docModificadoTipo=03&tipoDocumento=07&clienteId=${localComprobante.clienteNumeroDocumento}`);
                         }}
                         variant="outline"
                         className="w-full text-xs text-amber-600 hover:bg-amber-500/10 border-amber-500/20 font-semibold"
