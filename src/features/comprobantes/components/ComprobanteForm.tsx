@@ -55,12 +55,33 @@ export function ComprobanteForm({ onSubmit, loading, error, successData, resetSt
   const [notaMotivoCodigo, setNotaMotivoCodigo] = useState("01")
   const [notaMotivoDescripcion, setNotaMotivoDescripcion] = useState("")
 
+  // Read URL search params for pre-filling (e.g. from redirection for Boleta Credit Note)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const docModId = params.get("docModificadoId");
+    const docModTipo = params.get("docModificadoTipo");
+    const tipoDoc = params.get("tipoDocumento");
+    
+    if (docModId) setDocumentoModificadoId(docModId);
+    if (docModTipo) setDocumentoModificadoTipo(docModTipo);
+    if (tipoDoc) setTipoDocumento(tipoDoc as any);
+  }, []);
+
   // Load clients and products
   useEffect(() => {
     async function loadData() {
       try {
         const clientsData = await ClienteService.listar()
         setClientes(clientsData || [])
+        
+        // Prefill client from query param if present
+        const params = new URLSearchParams(window.location.search);
+        const clienteIdParam = params.get("clienteId");
+        if (clienteIdParam && clientsData) {
+          const found = clientsData.find(c => c.id === Number(clienteIdParam));
+          if (found) setSelectedCliente(found);
+        }
+        
         const productsData = await ProductoService.listar()
         setProductos(productsData || [])
       } catch (e) {
@@ -86,7 +107,7 @@ export function ComprobanteForm({ onSubmit, loading, error, successData, resetSt
   }, [tipoDocumento, documentoModificadoTipo])
 
   // Calculate Detracción when percentage changes
-  const subtotalPagar = items.reduce((acc, it) => acc + (it.cantidad * it.precioUnitario * 1.18), 0) - descuentoGlobal + totalImpuestoBolsa
+  const subtotalPagar = items.reduce((acc, it) => acc + (it.cantidad * it.precioUnitario), 0) - descuentoGlobal + totalImpuestoBolsa
 
   useEffect(() => {
     if (detraccionPorcentaje > 0) {
@@ -242,9 +263,10 @@ export function ComprobanteForm({ onSubmit, loading, error, successData, resetSt
     }
   }
 
-  const totalBase = items.reduce((acc, it) => acc + (it.cantidad * it.precioUnitario), 0)
+  const totalPagarCalculado = items.reduce((acc, it) => acc + (it.cantidad * it.precioUnitario), 0)
+  const totalBase = totalPagarCalculado / 1.18
   const totalIGV = totalBase * 0.18
-  const totalPagar = totalBase + totalIGV - descuentoGlobal + totalImpuestoBolsa
+  const totalPagar = totalPagarCalculado - descuentoGlobal + totalImpuestoBolsa
 
   if (successData) {
     return (

@@ -32,6 +32,7 @@ export interface Compra {
   proveedorNombre?: string
   proveedorDocumento?: string
   total?: number
+  totalPagar?: number
   creadoEn?: string
   items: CompraItem[]
 }

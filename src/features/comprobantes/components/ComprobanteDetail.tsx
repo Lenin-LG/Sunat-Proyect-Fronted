@@ -270,8 +270,8 @@ export function ComprobanteDetail({ comprobante, onClose }: ComprobanteDetailPro
                     <td className="py-1.5 px-2 font-mono">{it.cantidad}</td>
                     <td className="py-1.5 px-2 font-mono uppercase">{it.tipoUnidad || "NIU"}</td>
                     <td className="py-1.5 px-2">{it.descripcion}</td>
-                    <td className="py-1.5 px-2 text-right font-mono">S/. {(it.precioUnitario || 0).toFixed(2)}</td>
-                    <td className="py-1.5 px-2 text-right font-mono">S/. {((it.cantidad * it.precioUnitario) || 0).toFixed(2)}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">S/. {((it.precioUnitario * 1.18) || 0).toFixed(2)}</td>
+                    <td className="py-1.5 px-2 text-right font-mono">S/. {((it.cantidad * it.precioUnitario * 1.18) || 0).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -353,13 +353,31 @@ export function ComprobanteDetail({ comprobante, onClose }: ComprobanteDetailPro
 
                 {/* Void actions */}
                 {!isAnulado && localComprobante.estado === "ACEPTADO" && (
-                  <Button
-                    onClick={() => setVoidDialogOpen(true)}
-                    variant="outline"
-                    className="w-full text-xs text-destructive hover:bg-destructive/10 border-destructive/20"
-                  >
-                    Comunicar Baja (Anular)
-                  </Button>
+                  localComprobante.tipoDocumento === "01" ? (
+                    <Button
+                      onClick={() => setVoidDialogOpen(true)}
+                      variant="outline"
+                      className="w-full text-xs text-destructive hover:bg-destructive/10 border-destructive/20"
+                    >
+                      Comunicar Baja (Anular)
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-500/10 p-2.5 rounded border border-amber-500/20 leading-normal">
+                        Las boletas de venta no pueden ser anuladas mediante Comunicación de Baja. Para anular esta boleta, debe emitir una <strong>Nota de Crédito</strong>.
+                      </p>
+                      <Button
+                        onClick={() => {
+                          onClose();
+                          window.location.href = `/emitir?docModificadoId=${localComprobante.serie}-${localComprobante.numero}&docModificadoTipo=03&tipoDocumento=07`;
+                        }}
+                        variant="outline"
+                        className="w-full text-xs text-amber-600 hover:bg-amber-500/10 border-amber-500/20 font-semibold"
+                      >
+                        Emitir Nota de Crédito
+                      </Button>
+                    </div>
+                  )
                 )}
 
                 {isBajaPendiente && (

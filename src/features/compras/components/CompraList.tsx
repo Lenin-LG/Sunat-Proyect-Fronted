@@ -67,8 +67,9 @@ export function CompraList() {
 
   // Calculate purchase total locally if backend doesn't aggregate it in the list (or print it if it exists)
   const getCompraTotal = (c: Compra) => {
+    if (c.totalPagar) return c.totalPagar
     if (c.total) return c.total
-    return c.items ? c.items.reduce((acc, it) => acc + (it.cantidad * it.precioUnitario), 0) : 0
+    return c.items ? c.items.reduce((acc, it) => acc + (it.cantidad * it.precioUnitario * 1.18), 0) : 0
   }
 
   return (
@@ -241,8 +242,8 @@ export function CompraList() {
                           <span className="font-mono text-[9px] text-muted-foreground">{it.productoCodigo || `ID: ${it.productoId}`}</span>
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs">{it.cantidad}</TableCell>
-                        <TableCell className="text-right font-mono text-xs">S/. {it.precioUnitario.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-mono text-xs font-semibold text-foreground">S/. {(it.cantidad * it.precioUnitario).toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">S/. {(it.precioUnitario * 1.18).toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs font-semibold text-foreground">S/. {(it.cantidad * it.precioUnitario * 1.18).toFixed(2)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
