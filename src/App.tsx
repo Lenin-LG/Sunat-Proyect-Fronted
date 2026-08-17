@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Layout } from './core/components/Layout';
+import { ToastProvider } from './components/ui/toast';
 import { DashboardStats } from './features/comprobantes/components/DashboardStats';
 import { ComprobanteForm } from './features/comprobantes/components/ComprobanteForm';
 import { ComprobanteList } from './features/comprobantes/components/ComprobanteList';
@@ -297,7 +298,9 @@ function AppContent() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </BrowserRouter>
   );
 }

@@ -1,12 +1,18 @@
+import { toast } from "../../components/ui/toast"
+
 export interface ApiError {
   message: string;
   status?: number;
   details?: any;
 }
 
+export interface ApiRequestOptions extends RequestInit {
+  skipToast?: boolean;
+}
+
 export async function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: ApiRequestOptions = {}
 ): Promise<T> {
   const token = localStorage.getItem("sunat_auth_token");
   const headers = {
@@ -15,8 +21,10 @@ export async function apiRequest<T>(
     ...options.headers,
   };
 
+  const { skipToast, ...fetchOptions } = options;
+
   const response = await fetch(endpoint, {
-    ...options,
+    ...fetchOptions,
     headers,
   });
 
@@ -29,10 +37,15 @@ export async function apiRequest<T>(
     }
 
     const error: ApiError = {
-      message: errorDetails?.message || response.statusText || 'Error en la petición',
+      message: errorDetails?.message || errorDetails?.error || response.statusText || 'Error en la petición',
       status: response.status,
       details: errorDetails,
     };
+
+    if (!skipToast) {
+      toast.error(error.message);
+    }
+
     throw error;
   }
 
