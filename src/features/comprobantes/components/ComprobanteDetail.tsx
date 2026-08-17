@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Button } from "../../../components/ui/button"
+import { toast } from "../../../components/ui/toast"
+import { createPortal } from "react-dom"
 import { Input } from "../../../components/ui/input"
 import { Label } from "../../../components/ui/label"
 import { Select } from "../../../components/ui/select"
@@ -105,6 +107,7 @@ export function ComprobanteDetail({ comprobante, onClose }: ComprobanteDetailPro
       const res = await ComprobanteService.anular(localComprobante.id, motivoBaja)
       setLocalComprobante(res)
       setVoidDialogOpen(false)
+      toast.success("Solicitud de baja enviada a SUNAT con éxito.")
       // Save update to browser's main list history
       const savedHistory = localStorage.getItem("sunat_comprobantes_historial")
       if (savedHistory) {
@@ -124,6 +127,7 @@ export function ComprobanteDetail({ comprobante, onClose }: ComprobanteDetailPro
     try {
       const res = await ComprobanteService.consultarTicket(localComprobante.id)
       setLocalComprobante(res)
+      toast.success("Ticket verificado y comprobante actualizado con éxito.")
       // Save update to browser's main list history
       const savedHistory = localStorage.getItem("sunat_comprobantes_historial")
       if (savedHistory) {
@@ -132,7 +136,7 @@ export function ComprobanteDetail({ comprobante, onClose }: ComprobanteDetailPro
         localStorage.setItem("sunat_comprobantes_historial", JSON.stringify(updated))
       }
     } catch (err: any) {
-      alert(err.message || "Error al verificar el ticket.")
+      toast.error(err.message || "Error al verificar el ticket.")
     } finally {
       setTicketChecking(false)
     }
@@ -177,6 +181,7 @@ export function ComprobanteDetail({ comprobante, onClose }: ComprobanteDetailPro
       }
 
       setPaymentDialogOpen(false)
+      toast.success(`Pago de S/. ${pagoMonto.toFixed(2)} registrado con éxito.`)
       loadPagos(localComprobante.id)
     } catch (err: any) {
       setPayError(err.message || "Error al registrar el cobro.")
@@ -185,11 +190,11 @@ export function ComprobanteDetail({ comprobante, onClose }: ComprobanteDetailPro
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm no-print">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 no-print">
       
       {/* Click outside to close */}
-      <div className="fixed inset-0" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose} />
 
       <div className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-card border border-border rounded-xl shadow-2xl z-10 animate-fade-in flex flex-col">
         
@@ -583,6 +588,7 @@ export function ComprobanteDetail({ comprobante, onClose }: ComprobanteDetailPro
         </DialogContent>
       </Dialog>
 
-    </div>
+    </div>,
+    document.body
   )
 }

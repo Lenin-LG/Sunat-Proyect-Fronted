@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { Button } from "../../../components/ui/button"
+import { toast } from "../../../components/ui/toast"
 import { Input } from "../../../components/ui/input"
 import { Label } from "../../../components/ui/label"
 import { Select } from "../../../components/ui/select"
@@ -208,17 +209,17 @@ export function ComprobanteForm({ onSubmit, loading, error, successData, resetSt
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedCliente) {
-      alert("Por favor, seleccione un cliente.")
+      toast.warning("Por favor, seleccione un cliente.")
       return
     }
 
     if (tipoDocumento === "01" && selectedCliente.tipoEntidadId !== "6") {
-      alert("Para emitir una Factura, el cliente debe tener RUC. Este cliente tiene DNI u otro documento — selecciona uno con RUC, o cambia el Tipo Comprobante a Boleta.")
+      toast.warning("Para emitir una Factura, el cliente debe tener RUC. Este cliente tiene DNI u otro documento — selecciona uno con RUC, o cambia el Tipo Comprobante a Boleta.")
       return
     }
 
     if (items.some(it => !it.descripcion.trim() || it.precioUnitario <= 0)) {
-      alert("Todos los productos añadidos deben tener descripción y precio unitario mayor a 0.")
+      toast.warning("Todos los productos añadidos deben tener descripción y precio unitario mayor a 0.")
       return
     }
 
@@ -257,7 +258,10 @@ export function ComprobanteForm({ onSubmit, loading, error, successData, resetSt
     }
 
     try {
-      await onSubmit(tipoDocumento, payload)
+      const res = await onSubmit(tipoDocumento, payload)
+      if (res) {
+        toast.success(`¡Comprobante ${res.serie}-${res.numero} emitido con éxito!`)
+      }
     } catch (err) {
       // Handled in parent hook
     }
