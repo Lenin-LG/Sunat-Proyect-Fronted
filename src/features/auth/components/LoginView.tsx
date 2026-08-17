@@ -3,8 +3,9 @@ import { Button } from "../../../components/ui/button"
 import { Input } from "../../../components/ui/input"
 import { Label } from "../../../components/ui/label"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "../../../components/ui/card"
-import { LogIn, Key, User as UserIcon, ShieldAlert } from "lucide-react"
+import { LogIn, Key, User as UserIcon, ShieldAlert, Eye, EyeOff } from "lucide-react"
 import type { LoginCredentials } from "../types"
+import { toast } from "../../../components/ui/toast"
 
 interface LoginViewProps {
   onLogin: (credentials: LoginCredentials) => Promise<boolean>
@@ -17,11 +18,32 @@ export function LoginView({ onLogin, onSwitchToRegister, error }: LoginViewProps
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+
+  const validateForm = () => {
+    if (!username.trim()) {
+      setLocalError("El nombre de usuario es requerido.")
+      return false
+    }
+    if (username.trim().length < 3) {
+      setLocalError("El nombre de usuario debe tener al menos 3 caracteres.")
+      return false
+    }
+    if (!password) {
+      setLocalError("La contraseña es requerida.")
+      return false
+    }
+    if (password.length < 6) {
+      setLocalError("La contraseña debe tener al menos 6 caracteres.")
+      return false
+    }
+    setLocalError(null)
+    return true
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!username.trim() || !password.trim()) {
-      setLocalError("Por favor complete todos los campos.")
+    if (!validateForm()) {
       return
     }
 
@@ -29,8 +51,9 @@ export function LoginView({ onLogin, onSwitchToRegister, error }: LoginViewProps
     setLoading(true)
     try {
       await onLogin({ username, password })
+      toast.success("¡Bienvenido al sistema!")
     } catch (err: any) {
-      // Error handled by hook, but ensure local loading resets
+      // Error handled by hook or apiRequest toast
     } finally {
       setLoading(false)
     }
@@ -97,13 +120,24 @@ export function LoginView({ onLogin, onSwitchToRegister, error }: LoginViewProps
                 </span>
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
-                  className="pl-9 bg-slate-950/50 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-primary"
+                  className="pl-9 pr-10 bg-slate-950/50 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-primary"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-200 transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
             </div>
 

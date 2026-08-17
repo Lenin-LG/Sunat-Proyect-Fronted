@@ -4,8 +4,9 @@ import { Input } from "../../../components/ui/input"
 import { Label } from "../../../components/ui/label"
 import { Select } from "../../../components/ui/select"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "../../../components/ui/card"
-import { UserPlus, User as UserIcon, Mail, Key, Shield, ShieldAlert, CheckCircle2 } from "lucide-react"
+import { UserPlus, User as UserIcon, Mail, Key, Shield, ShieldAlert, CheckCircle2, Eye, EyeOff } from "lucide-react"
 import type { RegisterCredentials } from "../types"
+import { toast } from "../../../components/ui/toast"
 
 interface RegisterViewProps {
   onRegister: (credentials: RegisterCredentials) => Promise<boolean>
@@ -21,11 +22,48 @@ export function RegisterView({ onRegister, onSwitchToLogin, error }: RegisterVie
   const [loading, setLoading] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+
+  const validateForm = () => {
+    if (!username.trim()) {
+      setLocalError("El nombre de usuario es requerido.")
+      return false
+    }
+    if (username.trim().length < 3) {
+      setLocalError("El nombre de usuario debe tener al menos 3 caracteres.")
+      return false
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(username.trim())) {
+      setLocalError("El nombre de usuario solo puede contener letras, números, guiones y guiones bajos.")
+      return false
+    }
+
+    if (!email.trim()) {
+      setLocalError("El correo electrónico es requerido.")
+      return false
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email.trim())) {
+      setLocalError("El formato del correo electrónico no es válido.")
+      return false
+    }
+
+    if (!password) {
+      setLocalError("La contraseña es requerida.")
+      return false
+    }
+    if (password.length < 6) {
+      setLocalError("La contraseña debe tener al menos 6 caracteres.")
+      return false
+    }
+
+    setLocalError(null)
+    return true
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!username.trim() || !email.trim() || !password.trim()) {
-      setLocalError("Por favor complete todos los campos requeridos.")
+    if (!validateForm()) {
       return
     }
 
@@ -34,13 +72,14 @@ export function RegisterView({ onRegister, onSwitchToLogin, error }: RegisterVie
     try {
       const ok = await onRegister({ username, email, password, rol })
       if (ok) {
+        toast.success("¡Usuario registrado exitosamente!")
         setSuccess(true)
         setTimeout(() => {
           onSwitchToLogin()
         }, 2000)
       }
     } catch (err: any) {
-      // Handled by parent
+      // Handled by parent or apiRequest toast
     } finally {
       setLoading(false)
     }
@@ -129,13 +168,24 @@ export function RegisterView({ onRegister, onSwitchToLogin, error }: RegisterVie
                   </span>
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={loading}
-                    className="pl-9 bg-slate-950/50 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-primary"
+                    className="pl-9 pr-10 bg-slate-950/50 border-slate-800 text-slate-100 placeholder:text-slate-600 focus-visible:ring-primary"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-200 transition-colors"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
               </div>
 
