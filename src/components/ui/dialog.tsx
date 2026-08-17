@@ -1,4 +1,5 @@
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { cn } from "../../lib/utils"
 import { X } from "lucide-react"
 
@@ -22,13 +23,13 @@ export function Dialog({ open, onClose, children }: DialogProps) {
 
   if (!open) return null
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in no-print">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 no-print">
       {/* Click outside to close */}
-      <div className="fixed inset-0" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose} />
       
       {/* Modal Container */}
-      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-card border border-border rounded-lg shadow-lg z-10 animate-fade-in flex flex-col">
+      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-card border border-border rounded-lg shadow-2xl z-10 animate-fade-in flex flex-col">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -39,7 +40,8 @@ export function Dialog({ open, onClose, children }: DialogProps) {
         </button>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
