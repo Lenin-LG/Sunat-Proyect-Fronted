@@ -7,12 +7,19 @@ import { CompraService } from "../services/CompraService"
 import { CompraForm } from "./CompraForm"
 import type { Compra, CompraRequest } from "../types"
 import { PlusCircle, Search, RefreshCw, Loader2, Calendar, User, FileText, Eye, ShoppingCart } from "lucide-react"
+import { ProductoService } from "../../productos/services/ProductoService"
+import type { Producto } from "../../productos/types"
+import { ClienteService } from "../../clientes/services/ClienteService"
+import type { Entidad } from "../../clientes/types"
 
 export function CompraList() {
   const [compras, setCompras] = useState<Compra[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  const [productos, setProductos] = useState<Producto[]>([])
+  const [proveedores, setProveedores] = useState<Entidad[]>([])
 
   // Dialogs
   const [formOpen, setFormOpen] = useState(false)
@@ -32,8 +39,20 @@ export function CompraList() {
     }
   }
 
+  const loadCatalogData = async () => {
+    try {
+      const prods = await ProductoService.listar()
+      setProductos(prods || [])
+      const provs = await ClienteService.listar()
+      setProveedores(provs || [])
+    } catch (e) {
+      console.error("Error loading products/suppliers in CompraList", e)
+    }
+  }
+
   useEffect(() => {
     loadCompras()
+    loadCatalogData()
   }, [])
 
   const handleCreate = () => {
@@ -57,11 +76,15 @@ export function CompraList() {
 
   const filtered = compras.filter((c) => {
     const term = searchTerm.toLowerCase()
+    const prov = proveedores.find(p => p.id === c.proveedorId)
+    const pNombre = prov ? prov.nombreRazonSocial.toLowerCase() : ""
+    const pDoc = prov ? prov.numeroDocumento.toLowerCase() : ""
+    
     return (
       c.serie.toLowerCase().includes(term) ||
       c.numero.toString().includes(term) ||
-      (c.proveedorNombre && c.proveedorNombre.toLowerCase().includes(term)) ||
-      (c.proveedorDocumento && c.proveedorDocumento.includes(term))
+      pNombre.includes(term) ||
+      pDoc.includes(term)
     );
   })
 
@@ -69,7 +92,8 @@ export function CompraList() {
   const getCompraTotal = (c: Compra) => {
     if (c.totalPagar) return c.totalPagar
     if (c.total) return c.total
-    return c.items ? c.items.reduce((acc, it) => acc + (it.cantidad * it.precioUnitario * 1.18), 0) : 0
+    const details = (c as any).detalles || c.items || []
+    return details.reduce((acc: number, it: any) => acc + (it.cantidad * it.precioUnitario * 1.18), 0)
   }
 
   return (
@@ -156,16 +180,25 @@ export function CompraList() {
                     <span>{c.fechaEmision}</span>
                   </div>
                 </TableCell>
-                <TableCell className="max-w-[200px] truncate text-xs" title={c.proveedorNombre}>
-                  <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300">
-                    <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span>{c.proveedorNombre || `Proveedor ID ${c.proveedorId}`}</span>
-                  </div>
-                  {c.proveedorDocumento && (
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      {c.proveedorDocumento}
-                    </span>
-                  )}
+                <TableCell className="max-w-[200px] truncate text-xs">
+                  {(() => {
+                    const prov = proveedores.find(p => p.id === c.proveedorId)
+                    const pNombre = prov ? prov.nombreRazonSocial : `Proveedor ID ${c.proveedorId}`
+                    const pDoc = prov ? prov.numeroDocumento : ""
+                    return (
+                      <>
+                        <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-medium" title={pNombre}>
+                          <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span>{pNombre}</span>
+                        </div>
+                        {pDoc && (
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {pDoc}
+                          </span>
+                        )}
+                      </>
+                    )
+                  })()}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs font-bold text-foreground">
                   S/. {getCompraTotal(c).toFixed(2)}
@@ -206,55 +239,76 @@ export function CompraList() {
               Lista de artículos y costos unitarios asociados a la compra.
             </DialogDescription>
           </DialogHeader>
-          {selectedCompra && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-xs bg-secondary/25 p-3 border border-border/40 rounded-lg">
-                <div>
-                  <p className="text-muted-foreground">Comprobante:</p>
-                  <p className="font-semibold text-foreground font-mono">{selectedCompra.serie}-{selectedCompra.numero}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Fecha Emisión:</p>
-                  <p className="font-semibold">{selectedCompra.fechaEmision}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-muted-foreground">Proveedor:</p>
-                  <p className="font-semibold text-foreground">{selectedCompra.proveedorNombre || `ID ${selectedCompra.proveedorId}`}</p>
-                </div>
-              </div>
+          {selectedCompra && (() => {
+            const prov = proveedores.find(p => p.id === selectedCompra.proveedorId)
+            const pNombre = prov ? prov.nombreRazonSocial : `Proveedor ID ${selectedCompra.proveedorId}`
+            const pDoc = prov ? ` [${prov.numeroDocumento}]` : ""
+            const details = (selectedCompra as any).detalles || selectedCompra.items || []
 
-              <div className="space-y-1.5">
-                <span className="text-xs font-bold text-foreground">Artículos Comprados</span>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Producto</TableHead>
-                      <TableHead className="text-right">Cant</TableHead>
-                      <TableHead className="text-right">Costo Unit</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedCompra.items && selectedCompra.items.map((it, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="text-xs">
-                          <p className="font-medium text-foreground">{it.productoDescripcion || "Producto"}</p>
-                          <span className="font-mono text-[9px] text-muted-foreground">{it.productoCodigo || `ID: ${it.productoId}`}</span>
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs">{it.cantidad}</TableCell>
-                        <TableCell className="text-right font-mono text-xs">S/. {(it.precioUnitario * 1.18).toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-mono text-xs font-semibold text-foreground">S/. {(it.cantidad * it.precioUnitario * 1.18).toFixed(2)}</TableCell>
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-xs bg-secondary/25 p-3 border border-border/40 rounded-lg">
+                  <div>
+                    <p className="text-muted-foreground">Comprobante:</p>
+                    <p className="font-semibold text-foreground font-mono">{selectedCompra.serie}-{selectedCompra.numero}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Fecha Emisión:</p>
+                    <p className="font-semibold">{selectedCompra.fechaEmision}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-muted-foreground">Proveedor:</p>
+                    <p className="font-semibold text-foreground">{pNombre}{pDoc}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-xs font-bold text-foreground">Artículos Comprados</span>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Producto</TableHead>
+                        <TableHead className="text-right">Cant</TableHead>
+                        <TableHead className="text-right">Costo Unit</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {details.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-4 text-xs italic text-muted-foreground">
+                            No hay productos asociados a esta compra.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        details.map((it: any, idx: number) => {
+                          const prod = productos.find(p => p.id === it.productoId)
+                          const desc = prod ? prod.descripcion : `Producto ID: ${it.productoId}`
+                          const cod = prod ? prod.codigo : `ID: ${it.productoId}`
 
-              <div className="flex justify-end pt-4 border-t border-border/40 font-bold text-sm">
-                <span>Total Compra: S/. {getCompraTotal(selectedCompra).toFixed(2)}</span>
+                          return (
+                            <TableRow key={idx}>
+                              <TableCell className="text-xs">
+                                <p className="font-medium text-foreground">{desc}</p>
+                                <span className="font-mono text-[9px] text-muted-foreground">{cod}</span>
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-xs">{it.cantidad}</TableCell>
+                              <TableCell className="text-right font-mono text-xs">S/. {(it.precioUnitario * 1.18).toFixed(2)}</TableCell>
+                              <TableCell className="text-right font-mono text-xs font-semibold text-foreground">S/. {(it.cantidad * it.precioUnitario * 1.18).toFixed(2)}</TableCell>
+                            </TableRow>
+                          )
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="flex justify-end pt-4 border-t border-border/40 font-bold text-sm">
+                  <span>Total Compra: S/. {getCompraTotal(selectedCompra).toFixed(2)}</span>
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
         </DialogContent>
       </Dialog>
     </div>
