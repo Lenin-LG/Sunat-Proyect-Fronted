@@ -11,6 +11,8 @@ import { ProductoService } from "../../productos/services/ProductoService"
 import type { Entidad } from "../../clientes/types"
 import type { Producto } from "../../productos/types"
 import type { ComprobanteRequest, ComprobanteItemRequest, CuotaRequest, Comprobante } from "../types"
+import { ClienteForm } from "../../clientes/components/ClienteForm"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../../components/ui/dialog"
 
 interface ComprobanteFormProps {
   onSubmit: (tipo: "01" | "03" | "07" | "08", request: ComprobanteRequest) => Promise<Comprobante>
@@ -28,6 +30,7 @@ export function ComprobanteForm({ onSubmit, loading, error, successData, resetSt
   // Client Selection
   const [clientes, setClientes] = useState<Entidad[]>([])
   const [selectedCliente, setSelectedCliente] = useState<Entidad | null>(null)
+  const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false)
 
   // Products Catalog
   const [productos, setProductos] = useState<Producto[]>([])
@@ -75,12 +78,71 @@ export function ComprobanteForm({ onSubmit, loading, error, successData, resetSt
         const clientsData = await ClienteService.listar()
         setClientes(clientsData || [])
         
-        // Prefill client from query param if present
+        // Find the document from local storage to pre-load for note of credit
         const params = new URLSearchParams(window.location.search);
-        const clienteIdParam = params.get("clienteId");
-        if (clienteIdParam && clientsData) {
-          const found = clientsData.find(c => c.id === Number(clienteIdParam));
-          if (found) setSelectedCliente(found);
+        const docModId = params.get("docModificadoId");
+        let preloadedClient: Entidad | null = null;
+        
+        if (docModId) {
+          const saved = localStorage.getItem("sunat_comprobantes_historial");
+          if (saved) {
+            try {
+              const history = JSON.parse(saved) as Comprobante[];
+              const [modSerie, modNumeroStr] = docModId.split("-");
+              const modNumero = Number(modNumeroStr);
+              const foundDoc = history.find(c => c.serie === modSerie && Number(c.numero) === modNumero);
+              if (foundDoc) {
+                // Find client in clientsData by document number
+                const clientFound = clientsData.find(c => c.numeroDocumento === foundDoc.clienteNumeroDocumento);
+                if (clientFound) {
+                  preloadedClient = clientFound;
+                  setSelectedCliente(clientFound);
+                }
+                
+                // Preload items
+                if (foundDoc.detalles && foundDoc.detalles.length > 0) {
+                  setItems(foundDoc.detalles.map(it => ({
+                    descripcion: it.descripcion,
+                    cantidad: it.cantidad,
+                    precioUnitario: Number((it.precioUnitario * 1.18).toFixed(2)),
+                    codigoProductoSunat: it.codigoProductoSunat || "",
+                    codigoInterno: it.codigoInterno || "",
+                    tipoUnidad: it.tipoUnidad || "NIU",
+                    tipoAfectacionIgv: it.tipoAfectacionIgv || "10"
+                  })));
+                }
+                
+                // Preload other fields
+                if (foundDoc.formaPago) setFormaPago(foundDoc.formaPago as any);
+                if (foundDoc.descuentoGlobal) setDescuentoGlobal(foundDoc.descuentoGlobal);
+                if (foundDoc.anticipoReferencia) setAnticipoReferencia(foundDoc.anticipoReferencia);
+                if (foundDoc.detraccionCodigo) {
+                  setDetraccionCodigo(foundDoc.detraccionCodigo);
+                  setDetraccionPorcentaje(foundDoc.detraccionPorcentaje || 0);
+                  setDetraccionMonto(foundDoc.detraccionMonto || 0);
+                }
+                if (foundDoc.saldoPendiente) setSaldoPendiente(foundDoc.saldoPendiente);
+                if (foundDoc.cuotas) {
+                  setCuotas(foundDoc.cuotas.map(c => ({
+                    numeroCuota: c.numeroCuota,
+                    monto: c.monto,
+                    fechaVencimiento: c.fechaVencimiento
+                  })));
+                }
+              }
+            } catch (e) {
+              console.error("Error preloading document from local storage", e);
+            }
+          }
+        }
+        
+        // Fallback to client ID / document number query parameter if not preloaded from document
+        if (!preloadedClient) {
+          const clienteIdParam = params.get("clienteId");
+          if (clienteIdParam) {
+            const found = clientsData.find(c => c.id === Number(clienteIdParam) || c.numeroDocumento === clienteIdParam);
+            if (found) setSelectedCliente(found);
+          }
         }
         
         const productsData = await ProductoService.listar()
@@ -108,7 +170,7 @@ export function ComprobanteForm({ onSubmit, loading, error, successData, resetSt
   }, [tipoDocumento, documentoModificadoTipo])
 
   // Calculate Detracción when percentage changes
-  const subtotalPagar = items.reduce((acc, it) => acc + (it.cantidad * it.precioUnitario), 0) - descuentoGlobal + totalImpuestoBolsa
+  const subtotalPagar = items.reduce((acc, it) => acc + Math.round(it.cantidad * it.precioUnitario * 100) / 100, 0) - descuentoGlobal + totalImpuestoBolsa
 
   useEffect(() => {
     if (detraccionPorcentaje > 0) {
@@ -267,9 +329,19 @@ export function ComprobanteForm({ onSubmit, loading, error, successData, resetSt
     }
   }
 
-  const totalPagarCalculado = items.reduce((acc, it) => acc + (it.cantidad * it.precioUnitario), 0)
-  const totalBase = totalPagarCalculado / 1.18
-  const totalIGV = totalBase * 0.18
+  const { totalPagarCalculado, totalBase, totalIGV } = items.reduce(
+    (acc, it) => {
+      const itemTotalPagar = Math.round(it.cantidad * it.precioUnitario * 100) / 100
+      const itemTotalBase = Math.round((itemTotalPagar / 1.18) * 100) / 100
+      const itemTotalIGV = Math.round((itemTotalPagar - itemTotalBase) * 100) / 100
+      return {
+        totalPagarCalculado: acc.totalPagarCalculado + itemTotalPagar,
+        totalBase: acc.totalBase + itemTotalBase,
+        totalIGV: acc.totalIGV + itemTotalIGV,
+      }
+    },
+    { totalPagarCalculado: 0, totalBase: 0, totalIGV: 0 }
+  )
   const totalPagar = totalPagarCalculado - descuentoGlobal + totalImpuestoBolsa
 
   if (successData) {
@@ -318,7 +390,8 @@ export function ComprobanteForm({ onSubmit, loading, error, successData, resetSt
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-6 max-w-4xl mx-auto">
+    <>
+      <form onSubmit={handleSave} className="space-y-6 max-w-4xl mx-auto">
       {error && (
         <div className="p-4 text-xs bg-destructive/10 border border-destructive/20 rounded-lg text-destructive-foreground">
           {error}
@@ -367,6 +440,7 @@ export function ComprobanteForm({ onSubmit, loading, error, successData, resetSt
                 onChange={(e) => handleClientChange(e.target.value)}
                 disabled={loading}
                 required
+                className="flex-1"
               >
                 <option value="">-- Seleccionar de la base de datos --</option>
                 {clientes
@@ -377,6 +451,16 @@ export function ComprobanteForm({ onSubmit, loading, error, successData, resetSt
                     </option>
                   ))}
               </Select>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsNewClientModalOpen(true)}
+                disabled={loading}
+                className="shrink-0"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Nuevo
+              </Button>
             </div>
             <p className="text-[10px] text-muted-foreground">
               ¿No existe? Regístrelo primero en la sección de <strong>Clientes</strong>.
@@ -759,5 +843,32 @@ export function ComprobanteForm({ onSubmit, loading, error, successData, resetSt
       </div>
 
     </form>
+
+    {/* Dialog for New Client registration */}
+    <Dialog open={isNewClientModalOpen} onClose={() => setIsNewClientModalOpen(false)}>
+      <DialogContent className="max-w-lg bg-card border border-border rounded-xl shadow-2xl p-6">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-bold text-foreground">Registrar Nuevo Cliente</DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground mt-1">
+            Ingrese los datos del cliente. Se consultará automáticamente en SUNAT/RENIEC si presiona Consultar.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="mt-4">
+          <ClienteForm
+            onSubmit={async (newClientData) => {
+              const created = await ClienteService.registrar(newClientData);
+              // Refresh client list
+              setClientes((prev) => [...prev, created]);
+              // Select the newly created client
+              setSelectedCliente(created);
+              setIsNewClientModalOpen(false);
+              toast.success("Cliente registrado y seleccionado con éxito.");
+            }}
+            onCancel={() => setIsNewClientModalOpen(false)}
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
